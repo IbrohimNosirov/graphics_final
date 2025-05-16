@@ -40,9 +40,6 @@ faces = np.array(mesh.faces, dtype=np.int32)
 mesh_triangles = ti.field(int, shape=np.prod(faces.shape))
 mesh_triangles.from_numpy(faces.ravel())
 
-# Create house scene for collision
-scene = Scene()
-
 # Number of triangles and vertices
 N_triangles = faces.shape[0]
 triangles = ti.Vector.field(3, ti.i32, N_triangles)
@@ -75,6 +72,8 @@ outer_edges.from_numpy(np_outer_edges)
 
 # TODO: initialize as BoxState
 
+# Create house scene for collision
+scene = Scene(outer_edges, va)
 
 #############################################################
 # Simulation parameters

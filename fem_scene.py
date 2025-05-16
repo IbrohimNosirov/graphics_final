@@ -30,37 +30,45 @@ class BoxState:
 # Scene-related Data
 @ti.data_oriented
 class Scene:
-    def __init__(self):
-        self.startScene()
-
-    def startScene(self):
+    def __init__(self, outer_edges, edge_vertices):
+        self.init_outer_edges(outer_edges, edge_vertices)
         self.init_gingerbread_box()
         self.init_boxes()
+
+    def init_outer_edges(self, outer_edges, edge_vertices):
+        N_outer_edges = outer_edges.shape[0]
+        self.outer_edges = BoxState.field(shape=(N_outer_edges,))
+        for i in range(N_outer_edges):
+            # TODO: get vertex positions
+            vertex_pair = outer_edges[i]
+            v1 = edge_vertices[vertex_pair[0]]
+            v2 = edge_vertices[vertex_pair[1]]
+            eps = 1.0e-4
+            self.outer_edges[i].p = (v1 + v2)/2
+            self.outer_edges[i].q = v1 - v2
+            self.outer_edges[i].l = ti.Vector([np.linalg.norm(v1 - v2), eps])
+            self.outer_edges[i].m = 0.1
+            self.outer_edges[i].I = (1/12) * self.outer_edges[i].m\
+                                    * self.outer_edges[i].l.dot(self.outer_edges[i].l)
+            self.outer_edges[i].rad = eps
 
     def init_boxes(self):
         # TODO: write these as arguments
         numBoxes = 1 
         pos1 = ti.Vector([0.2,0.2])
 
-
         pos = [pos1]
         self.boxes = BoxState.field(shape=(numBoxes,))
         for i in range(numBoxes): 
             self.init_box(i, pos[i])
-
     
     def init_box(self, i, pos1): 
         """
         Initializes the ith box 
         """
-
         self.boxes[i].p = pos1
         self.boxes[i].q = ti.Vector([0, 1])
         self.boxes[i].l = ti.Vector([0.2,0.2])
-
-       
-        
-
 
     def init_box_boundaries(self):
         self.house_width = 0.9
@@ -90,7 +98,6 @@ class Scene:
             self.boundaries.eps.from_numpy(np.ones(5,  dtype=np.float32) * 1e-2)
             self.boundary_indices = ti.field(shape=(10,), dtype=ti.i32)
             self.vertex_indices = ti.field(shape=(8,), dtype=ti.i32)
-
 
     @ti.kernel
     def init_boundary_indices(self):

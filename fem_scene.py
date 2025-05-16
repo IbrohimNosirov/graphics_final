@@ -54,10 +54,11 @@ class Scene:
 
     def init_boxes(self):
         # TODO: write these as arguments
-        numBoxes = 1 
+        numBoxes = 2 
         pos1 = ti.Vector([0.2,0.2])
+        pos2 = ti.Vector([0.5,0.2])
 
-        pos = [pos1]
+        pos = [pos1, pos2]
         self.boxes = BoxState.field(shape=(numBoxes,))
         for i in range(numBoxes): 
             self.init_box(i, pos[i])
@@ -66,8 +67,9 @@ class Scene:
         """
         Initializes the ith box 
         """
+        theta = 0.5
         self.boxes[i].p = pos1
-        self.boxes[i].q = ti.Vector([0, 1])
+        self.boxes[i].q = ti.Vector([tm.cos(theta), tm.sin(theta)])
         self.boxes[i].l = ti.Vector([0.2,0.2])
 
     def init_box_boundaries(self):

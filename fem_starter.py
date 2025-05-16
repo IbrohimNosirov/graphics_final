@@ -234,7 +234,7 @@ while window.running:
 
     # Draw the boxes 
     for i in range(scene.boxes.shape[0]):
-        vertices = get_corners(scene.boxes[i].p, scene.boxes[i].l)
+        vertices = get_corners(scene.boxes[i])
         canvas.lines(vertices, width=0.01, indices=scene.vertex_indices, color=(0.4, 0.2, 0.0))
 
     # GUI text

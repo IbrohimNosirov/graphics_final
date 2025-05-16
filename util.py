@@ -69,17 +69,32 @@ class DistanceMap:
 
         return arr_N // 2
 
-def get_corners(p, l): 
+def get_corners(box): 
     """
     Get the four corners based off 
     """
-    ps_np = np.array([  [p[0] - 0.5 * l[0], p[1] + 0.5 * l[1]],
-                        [p[0] - 0.5 * l[0], p[1] - 0.5 * l[1]],
-                        [p[0] + 0.5 * l[0], p[1] - 0.5 * l[1]],
-                        [p[0] + 0.5 * l[0], p[1] + 0.5 * l[1]],],
-                        dtype=np.float32)
-    
-    vertices = ti.Vector.field(2, shape=4, dtype=ti.f32)
-    vertices.from_numpy(ps_np)
+    p = box.p
+    q = box.q
+    l = box.l
 
-    return vertices
+    ps_np = ti.Vector.field(2, dtype=ti.f32, shape=4)  # 4 vectors of 2D float32
+
+    # the corners of the square 
+    ps_np[0] = ti.Vector([p[0] - 0.5 * l[0], p[1] + 0.5 * l[1]])
+    ps_np[1] = ti.Vector([p[0] - 0.5 * l[0], p[1] - 0.5 * l[1]])
+    ps_np[2] = ti.Vector([p[0] + 0.5 * l[0], p[1] - 0.5 * l[1]])
+    ps_np[3] = ti.Vector([p[0] + 0.5 * l[0], p[1] + 0.5 * l[1]])
+    
+    
+    for i in range(4): 
+        x = ps_np[i][0] - p[0]
+        y = ps_np[i][1] - p[1]
+
+        x_new = x * q[0] - y * q[1]
+        y_new = x * q[1] + y * q[0]  # notice the + here
+
+        ps_np[i][0] = x_new + p[0]
+        ps_np[i][1] = y_new + p[1]
+    
+
+    return ps_np

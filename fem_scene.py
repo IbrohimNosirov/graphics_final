@@ -14,6 +14,18 @@ class Boundary:
     eps:float
 
 # also add a BoxState class
+@ti.dataclass
+class BoxState: 
+    p : vec2  # position (center of mass)
+    q : vec2  # orientation (cosine/sine pair)
+    v : vec2  # linear velocity
+    ω : float # angular velocity
+    l : vec2  # dimensions of box
+    m : float # mass
+    I : float # moment of inertia
+    rad: float # collision detection radius
+    n: vec2 # normal vector 
+    eps: float # distance to the boundary
 
 # Scene-related Data
 @ti.data_oriented
@@ -23,6 +35,40 @@ class Scene:
 
     def startScene(self):
         self.init_gingerbread_box()
+
+    def init_boxes(self):
+        # TODO: write these as arguments
+        numBoxes = 1 
+        pos1 = ti.Vector([0.2,0.2])
+
+
+        pos = [pos1]
+        self.boxes = BoxState.field(shape=(numBoxes,))
+        for i in range(numBoxes): 
+            self.init_box(i, pos[i])
+
+    def init_box(self, i, pos1): 
+        """
+        Initializes the ith box 
+        """
+
+        self.boxes[i].p = pos1
+        self.boxes[i].q = ti.Vector([0, 1])
+        self.boxes[i].l = ti.Vector([0.2,0.2])
+
+        self.nboundary = 4
+        self.boundaries = Boundary.field(shape=(4,))
+        ps_np = np.array([  [self.boxes[i].p[0] - 0.5 * self.boxes[i].l, self.boxes[i].p[1] + 0.5 * self.boxes[i].l],
+                            [self.boxes[i].p[0] - 0.5 * self.boxes[i].l, self.boxes[i].p[1] - 0.5 * self.boxes[i].l],
+                            [self.boxes[i].p[0] + 0.5 * self.boxes[i].l, self.boxes[i].p[1] - 0.5 * self.boxes[i].l],
+                            [self.boxes[i].p[0] + 0.5 * self.boxes[i].l, self.boxes[i].p[1] + 0.5 * self.boxes[i].l],],
+                            dtype=np.float32)
+        
+
+        self.boundaries.p.from_numpy(ps_np)
+        self.boundaries.n.from_numpy(np.array([[-1, 0], [0, -1], [1, 0], [0,1]], dtype=np.float32))
+        self.boundaries.eps.from_numpy(np.ones(4,  dtype=np.float32) * 1e-2)
+        self.boundary_indices = ti.field(shape=(8,), dtype=ti.i32)
 
     def init_box_boundaries(self):
         self.house_width = 0.9

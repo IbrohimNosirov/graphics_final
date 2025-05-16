@@ -72,7 +72,7 @@ class Scene:
         self.boxes[i].q = ti.Vector([tm.cos(theta), tm.sin(theta)])
         self.boxes[i].l = ti.Vector([0.2,0.2])
         self.boxes[i].v = ti.Vector([0.0, 0.1])
-        self.boxes[i].ω = 0.3
+        self.boxes[i].ω = 3
 
     def init_box_boundaries(self):
         self.house_width = 0.9

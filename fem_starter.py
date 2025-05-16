@@ -116,8 +116,8 @@ def init_D0_inv():
 def update_box_position():
     for i in range(scene.boxes.shape[0]): 
         scene.boxes[i].p += dh * scene.boxes[i].v
-        # scene.boxes[i].q += dh * scene.boxes[i].ω
-        # scene.boxes[i].q = tm.length()
+        scene.boxes[i].q += dh * cross(scene.boxes[i].ω, scene.boxes[i].q)
+        scene.boxes[i].q /= scene.boxes[i].q.norm()
 
 
 # Timestep kernel using NeoHookean model only

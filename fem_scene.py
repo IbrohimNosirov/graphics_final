@@ -35,6 +35,7 @@ class Scene:
 
     def startScene(self):
         self.init_gingerbread_box()
+        self.init_boxes()
 
     def init_boxes(self):
         # TODO: write these as arguments
@@ -47,6 +48,7 @@ class Scene:
         for i in range(numBoxes): 
             self.init_box(i, pos[i])
 
+    
     def init_box(self, i, pos1): 
         """
         Initializes the ith box 
@@ -56,19 +58,9 @@ class Scene:
         self.boxes[i].q = ti.Vector([0, 1])
         self.boxes[i].l = ti.Vector([0.2,0.2])
 
-        self.nboundary = 4
-        self.boundaries = Boundary.field(shape=(4,))
-        ps_np = np.array([  [self.boxes[i].p[0] - 0.5 * self.boxes[i].l, self.boxes[i].p[1] + 0.5 * self.boxes[i].l],
-                            [self.boxes[i].p[0] - 0.5 * self.boxes[i].l, self.boxes[i].p[1] - 0.5 * self.boxes[i].l],
-                            [self.boxes[i].p[0] + 0.5 * self.boxes[i].l, self.boxes[i].p[1] - 0.5 * self.boxes[i].l],
-                            [self.boxes[i].p[0] + 0.5 * self.boxes[i].l, self.boxes[i].p[1] + 0.5 * self.boxes[i].l],],
-                            dtype=np.float32)
+       
         
 
-        self.boundaries.p.from_numpy(ps_np)
-        self.boundaries.n.from_numpy(np.array([[-1, 0], [0, -1], [1, 0], [0,1]], dtype=np.float32))
-        self.boundaries.eps.from_numpy(np.ones(4,  dtype=np.float32) * 1e-2)
-        self.boundary_indices = ti.field(shape=(8,), dtype=ti.i32)
 
     def init_box_boundaries(self):
         self.house_width = 0.9
@@ -97,12 +89,18 @@ class Scene:
                                                     [-rooftop_left[1], rooftop_left[0]]], dtype=np.float32))
             self.boundaries.eps.from_numpy(np.ones(5,  dtype=np.float32) * 1e-2)
             self.boundary_indices = ti.field(shape=(10,), dtype=ti.i32)
+            self.vertex_indices = ti.field(shape=(8,), dtype=ti.i32)
+
 
     @ti.kernel
     def init_boundary_indices(self):
         for i in range(5):
             self.boundary_indices[2 * i] = i
             self.boundary_indices[2 * i + 1] = (i + 1) % 5
+
+        for i in range(4):
+            self.vertex_indices[2 * i] = i
+            self.vertex_indices[2 * i + 1] = (i + 1) % 4
 
     def init_gingerbread_box(self):
         self.init_box_boundaries()

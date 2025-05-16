@@ -9,7 +9,9 @@ from fem_scene import Scene
 from force_calc import (
     compute_D, compute_F, compute_P_NeoHookean, compute_H, update_forces)
 
-ti.init(arch=ti.cpu, debug=True)
+# ti.init(arch=ti.cpu, debug=True)
+
+ti.init(arch=ti.vulkan)
 
 ## physical quantities
 YoungsModulus = ti.field(ti.f32, ())
@@ -39,7 +41,7 @@ mesh_triangles = ti.field(int, shape=np.prod(faces.shape))
 mesh_triangles.from_numpy(faces.ravel())
 
 # Create house scene for collision
-house = Scene()
+scene = Scene()
 
 # Number of triangles and vertices
 N_triangles = faces.shape[0]
@@ -147,10 +149,10 @@ def timestep():
     
     # Handle collision with house boundaries
     for i in range(N):
-        for j in range(house.boundaries.p.shape[0]):
-            b = house.boundaries.p[j]
-            eps = house.boundaries.eps[j]
-            n = house.boundaries.n[j]
+        for j in range(scene.boundaries.p.shape[0]):
+            b = scene.boundaries.p[j]
+            eps = scene.boundaries.eps[j]
+            n = scene.boundaries.n[j]
             
             next_pos = x[i] + dh * v[i]
             dist = (next_pos - b).dot(n)
@@ -229,7 +231,12 @@ while window.running:
     canvas.lines(vertices=x, indices=edges, width=0.002, color=(0,0,0))
 
     # Draw the gingerbread house
-    canvas.lines(house.boundaries.p, width=0.01, indices=house.boundary_indices, color=(0.4, 0.2, 0.0))
+    canvas.lines(scene.boundaries.p, width=0.01, indices=scene.boundary_indices, color=(0.4, 0.2, 0.0))
+
+    # Draw the boxes 
+    for i in range(scene.boxes.shape[0]):
+        vertices = get_corners(scene.boxes[i].p, scene.boxes[i].l)
+        canvas.lines(vertices, width=0.01, indices=scene.vertex_indices, color=(0.4, 0.2, 0.0))
 
     # GUI text
     gui = window.get_gui()

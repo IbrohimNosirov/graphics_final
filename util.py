@@ -1,5 +1,6 @@
 import taichi as ti
 import taichi.math as tm
+import numpy as np 
 
 # For pinning vertices / creating handle-based forces
 @ti.data_oriented
@@ -67,3 +68,18 @@ class DistanceMap:
                 self.di[arr_N // 2 - 1] = self.di[arr_N // 2 - 1] if self.d[arr_N // 2 - 1] < self.d_temp[arr_N - 1] else self.di_temp[arr_N - 1]
 
         return arr_N // 2
+
+def get_corners(p, l): 
+    """
+    Get the four corners based off 
+    """
+    ps_np = np.array([  [p[0] - 0.5 * l[0], p[1] + 0.5 * l[1]],
+                        [p[0] - 0.5 * l[0], p[1] - 0.5 * l[1]],
+                        [p[0] + 0.5 * l[0], p[1] - 0.5 * l[1]],
+                        [p[0] + 0.5 * l[0], p[1] + 0.5 * l[1]],],
+                        dtype=np.float32)
+    
+    vertices = ti.Vector.field(2, shape=4, dtype=ti.f32)
+    vertices.from_numpy(ps_np)
+
+    return vertices

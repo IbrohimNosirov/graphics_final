@@ -70,7 +70,6 @@ np_outer_edges = np.array([list(e) for e in outer_edges_set])
 outer_edges = ti.Vector.field(2, shape=N_outer_edges, dtype=int)
 outer_edges.from_numpy(np_outer_edges)
 
-# TODO: initialize as BoxState
 
 # Create house scene for collision
 scene = Scene(outer_edges, va)
@@ -111,6 +110,13 @@ def init_D0_inv():
         D0 = compute_D(a, b, c)
         Area[i] = 0.5 * tm.determinant(D0)
         D0_inv[i] = tm.inverse(D0)
+
+
+@ti.func 
+def update_box_position():
+    for i in range(scene.boxes.shape[0]): 
+        scene.boxes[i].p += dh * scene.boxes[i].v
+        scene.boxes[i].q += dh * scene.boxes[i].ω
 
 # Timestep kernel using NeoHookean model only
 @ti.kernel
@@ -162,6 +168,8 @@ def timestep():
                 if v_n.dot(n) < 0:     
                     v[i] = v_t
     
+    update_box_position()
+
     # Update positions
     for i in range(N):
         x[i] += dh * v[i]

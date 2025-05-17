@@ -42,12 +42,22 @@ class Scene:
         self.boundaries = Boundary.field(shape=(self.nboundary,))
         self.normals = ti.Vector.field(2, shape=(4,), dtype=ti.f32)
         self.normals.from_numpy(np.array([[0,-1], [1,0], [0,1], [-1,0]], dtype=np.float32))
-
+        self.corners = ti.Vector.field(2, shape=(4,), dtype=ti.f32)
+        self.corners.from_numpy(np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]],
+                                    dtype=np.float32))
+        self.objects = BoxState.field(shape=(self.N))
 
         # initialize
         self.init_outer_edges(outer_edges, edge_vertices)
         self.init_gingerbread_box()
         self.init_boxes()
+        self.init_objects()
+    
+    def init_objects(self):
+        for i in range(self.num_boxes):
+            self.objects[i] = self.boxes[i]
+        for i in range(self.num_boxes, self.N_outer_edges):
+            self.objects[i] = self.outer_edges[i]
 
     def init_outer_edges(self, outer_edges, edge_vertices):
         for i in range(self.N_outer_edges):
@@ -87,6 +97,9 @@ class Scene:
         self.boxes[i].l = ti.Vector([0.1,0.1])
         self.boxes[i].v = ti.Vector([0.0, 0.1])
         self.boxes[i].ω = 3
+        box = self.boxes[i]
+        self.boxes[i].m = box.l.x * box.l.y
+        self.boxes[i].I = (1 / 12) * self.boxes[i].m * box.l.dot(box.l)
         self.boxes[i].is_mesh = False 
 
     def init_box_boundaries(self):

@@ -117,14 +117,12 @@ def init_D0_inv():
         Area[i] = 0.5 * tm.determinant(D0)
         D0_inv[i] = tm.inverse(D0)
 
-
 @ti.func 
 def update_box_position():
-    for i in range(scene.boxes.shape[0]): 
-        scene.boxes[i].p += dh * scene.boxes[i].v
-        scene.boxes[i].q += dh * cross(scene.boxes[i].ω, scene.boxes[i].q)
-        scene.boxes[i].q /= scene.boxes[i].q.norm()
-
+    for i in range(scene.num_boxes): 
+        scene.objects[i].p += dh * scene.objects[i].v
+        scene.objects[i].q += dh * cross(scene.objects[i].ω, scene.objects[i].q)
+        scene.objects[i].q /= scene.objects[i].q.norm()
 
 # Timestep kernel using NeoHookean model only
 @ti.kernel
@@ -175,26 +173,26 @@ def timestep():
                 v_t = v[i] - v_n       
                 if v_n.dot(n) < 0:     
                     v[i] = v_t
-    
-    update_box_position()
 
     collision.clearCollision()
     collision.collide_bounds()
-    collision.collide_all()
-    #collide_all(list of box_states) -> collisions (i1 >= 0)
+#    collision.collide_all()
 
-    ## collision response
-    # response.PGS()
-    # response.apply_impulses()
-
-    # if FEM object and dv != 0
-    # v[i] = v[i] + dv
+    # collision response
+    response.PGS()
+    # update the movement of boxes
+    response.apply_impulses()
+    # update FEM
+    for i in range(scene.N_outer_edges):
+        dv_idx = i + scene.num_boxes
+        fem_idx = outer_edges[i][0]
+        v[fem_idx] = v[fem_idx] + response.dv[dv_idx]
 
     # Update FEM positions
     for i in range(N):
         x[i] += dh * v[i]
 
-    # TODO: update rigid body positions
+    update_box_position()
 
 ##############################################################
 
@@ -259,14 +257,16 @@ while window.running:
         timestep()
 
     # Draw wireframe of mesh
-    canvas.lines(vertices=x, indices=edges, width=0.002, color=(0,0,0))
+    canvas.lines(vertices=x, indices=edges, width=0.2, color=(0,0,0))
+    canvas.lines(vertices=x, indices=outer_edges, width=0.2, color=(255,0,0))
 
     # Draw the gingerbread house
-    canvas.lines(scene.boundaries.p, width=0.01, indices=scene.boundary_indices, color=(0.4, 0.2, 0.0))
+    canvas.lines(scene.boundaries.p, width=0.1, indices=scene.boundary_indices,
+    color=(0, 0, 0))
 
     # Draw the boxes 
-    for i in range(scene.boxes.shape[0]):
-        vertices = get_corners(scene.boxes[i], ps_np)
+    for i in range(scene.num_boxes):
+        vertices = get_corners(scene.objects[i], ps_np)
         canvas.lines(vertices, width=0.01, indices=scene.vertex_indices, color=(0.4, 0.2, 0.0))
 
     # GUI text

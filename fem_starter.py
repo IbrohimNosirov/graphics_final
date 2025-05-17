@@ -11,9 +11,9 @@ from response import *
 from force_calc import (
     compute_D, compute_F, compute_P_NeoHookean, compute_H, update_forces)
 
-#ti.init(arch=ti.cpu, debug=True)
+ti.init(arch=ti.cpu, debug=True)
 
-ti.init(arch=ti.vulkan)
+# ti.init(arch=ti.vulkan)
 
 ## physical quantities
 Cr = 1.0

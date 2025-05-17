@@ -119,9 +119,11 @@ class Collision:
 
     @ti.func
     def collide_bounds(self):
-        for i in range(self.scene.N):
+        """Detect collision between box and house"""
+        for i in range(self.scene.num_boxes):
             box = self.scene.boxes[i]
-            for j in range(4): # a box has 4 bounds, but an edge only has 1
+            # print(box)
+            for j in range(self.scene.nboundary):
                 boundary = self.scene.boundaries[j]
                 x = boundary.p
                 n = boundary.n
@@ -185,82 +187,162 @@ class Collision:
 
     @ti.func
     def collide_all(self):
-        for i in range(self.scene.N):
-            for j in range(i):
-                R = (self.scene.boxes[i].rad + self.scene.boxes[j].rad) * ti.sqrt(2)
-                r_sum = 0.5 * (self.scene.boxes[i].l + self.scene.boxes[j].l)
-                R = R + ti.sqrt(r_sum.x * r_sum.x + r_sum.y * r_sum.y)
-                if tm.distance(self.scene.boxes[i].p, self.scene.boxes[j].p) > R:
-                    continue
+        for i in range(self.scene.num_boxes):
+            for j in range(self.scene.N-1):
+                if j < self.scene.num_boxes and i != j:
+                    R = (self.scene.boxes[i].rad + self.scene.boxes[j].rad) * ti.sqrt(2)
+                    r_sum = 0.5 * (self.scene.boxes[i].l + self.scene.boxes[j].l)
+                    R = R + ti.sqrt(r_sum.x * r_sum.x + r_sum.y * r_sum.y)
+                    if tm.distance(self.scene.boxes[i].p, self.scene.boxes[j].p) > R:
+                        continue
 
-                incident_body, iv, ie, sep = self.collide_box_box(self.scene.boxes[i],
-                                                                  self.scene.boxes[j])
-                if sep < 0:
-                    self.coll[i] = ti.u8(255)
-                    self.coll[j] = ti.u8(255)
-                    iInc = j if incident_body else i  # index of incident body
-                    iRef = i if incident_body else j  # index of reference body
-                    radInc = self.scene.boxes[iInc].rad
-                    radRef = self.scene.boxes[iRef].rad
-                    xColl = b2w(self.scene.boxes[iInc].p,
-                                self.scene.boxes[iInc].q,
-                                self.scene.boundaries.p[iv] * self.scene.boxes[iInc].l / 2)
-                    nColl = rot(self.scene.boxes[iRef].q, self.scene.boundaries.n[ie])
-                    e1 = b2w(self.scene.boxes[iRef].p,
-                             self.scene.boxes[iRef].q,
-                             self.scene.boundaries.p[ie] * self.scene.boxes[iRef].l / 2)
-                    e2 = b2w(self.scene.boxes[iRef].p, self.scene.boxes[iRef].q,
-                             self.scene.boundaries.p[(ie + 1) % 4] * self.scene.boxes[iRef].l / 2)
+                    incident_body, iv, ie, sep = self.collide_box_box(self.scene.boxes[i],
+                                                                    self.scene.boxes[j])
+                    if sep < 0:
+                        print('colliding')
+                        self.coll[i] = ti.u8(255)
+                        self.coll[j] = ti.u8(255)
+                        iInc = j if incident_body else i  # index of incident body
+                        iRef = i if incident_body else j  # index of reference body
+                        radInc = self.scene.boxes[iInc].rad
+                        radRef = self.scene.boxes[iRef].rad
+                        xColl = b2w(self.scene.boxes[iInc].p,
+                                    self.scene.boxes[iInc].q,
+                                    self.scene.boundaries.p[iv] * self.scene.boxes[iInc].l / 2)
+                        nColl = rot(self.scene.boxes[iRef].q, self.scene.boundaries.n[ie])
+                        e1 = b2w(self.scene.boxes[iRef].p,
+                                self.scene.boxes[iRef].q,
+                                self.scene.boundaries.p[ie] * self.scene.boxes[iRef].l / 2)
+                        e2 = b2w(self.scene.boxes[iRef].p, self.scene.boxes[iRef].q,
+                                self.scene.boundaries.p[(ie + 1) % 4] * self.scene.boxes[iRef].l / 2)
 
-                    eInc, iv2 = self.find_incidentEdge(iv, self.scene.boxes[iInc], nColl)
-                    xColl2 = b2w(self.scene.boxes[iInc].p, self.scene.boxes[iInc].q,
-                                 self.scene.boundaries.p[iv2] * self.scene.boxes[iInc].l / 2)
+                        eInc, iv2 = self.find_incidentEdge(iv, self.scene.boxes[iInc], nColl)
+                        xColl2 = b2w(self.scene.boxes[iInc].p, self.scene.boxes[iInc].q,
+                                    self.scene.boundaries.p[iv2] * self.scene.boxes[iInc].l / 2)
 
-                    vIn = ContactPoints(p1=Point(v=xColl, vi=iv, boxID=iInc),
-                                        p2=Point(v=xColl2, vi=iv2, boxID=iInc))
-                    inc_tangent_12 = (e1 - e2).normalized()
-                    inc_tangent_21 = -inc_tangent_12
-                    offset_12 = tm.dot(e1, inc_tangent_12)
-                    offset_21 = tm.dot(e2, inc_tangent_21)
+                        vIn = ContactPoints(p1=Point(v=xColl, vi=iv, boxID=iInc),
+                                            p2=Point(v=xColl2, vi=iv2, boxID=iInc))
+                        inc_tangent_12 = (e1 - e2).normalized()
+                        inc_tangent_21 = -inc_tangent_12
+                        offset_12 = tm.dot(e1, inc_tangent_12)
+                        offset_21 = tm.dot(e2, inc_tangent_21)
 
-                    planePoint = 0.5 * (e1 + e2)
+                        planePoint = 0.5 * (e1 + e2)
 
-                    clipped_ps1 = self.clipSegmentToRay(vIn, inc_tangent_12, offset_12, iv)
-                    clipped_ps2 = self.clipSegmentToRay(clipped_ps1, inc_tangent_21, offset_21, iv2)
-                    # assert (clipped_ps2.count == 2)
+                        clipped_ps1 = self.clipSegmentToRay(vIn, inc_tangent_12, offset_12, iv)
+                        clipped_ps2 = self.clipSegmentToRay(clipped_ps1, inc_tangent_21, offset_21, iv2)
+                        # assert (clipped_ps2.count == 2)
 
-                    sep1 = (clipped_ps2.p1.v - planePoint).dot(nColl)
-                    sep2 = (clipped_ps2.p2.v - planePoint).dot(nColl)
-                    n_pc = 0
-                    rRef1 = vec2(0, 0)
-                    rInc1 = vec2(0, 0)
-                    rRef2 = vec2(0, 0)
-                    rInc2 = vec2(0, 0)
-                    is1cp = False
-                    is2cp = False
-                    if sep1 <= radInc + radRef:
-                        xColl1 = clipped_ps2.p1.v + 0.5 * tm.dot(planePoint - clipped_ps2.p1.v, nColl) * nColl
-                        cpi = ti.atomic_add(self.num_cp[None], 1)
-                        self.collPs[cpi] = xColl1
-                        rInc1 = xColl1 - self.scene.boxes[iInc].p
-                        rRef1 = xColl1 - self.scene.boxes[iRef].p
-                        n_pc += 1
-                        is1cp = True
-                    if sep2 <= radInc + radRef:
-                        xColl2 = clipped_ps2.p2.v + 0.5 * tm.dot(planePoint - clipped_ps2.p2.v, nColl) * nColl
-                        cpi = ti.atomic_add(self.num_cp[None], 1)
-                        self.collPs[cpi] = xColl2
-                        rInc2 = xColl2 - self.scene.boxes[iInc].p
-                        rRef2 = xColl2 - self.scene.boxes[iRef].p
-                        n_pc += 1
-                        is2cp = True
+                        sep1 = (clipped_ps2.p1.v - planePoint).dot(nColl)
+                        sep2 = (clipped_ps2.p2.v - planePoint).dot(nColl)
+                        n_pc = 0
+                        rRef1 = vec2(0, 0)
+                        rInc1 = vec2(0, 0)
+                        rRef2 = vec2(0, 0)
+                        rInc2 = vec2(0, 0)
+                        is1cp = False
+                        is2cp = False
+                        if sep1 <= radInc + radRef:
+                            xColl1 = clipped_ps2.p1.v + 0.5 * tm.dot(planePoint - clipped_ps2.p1.v, nColl) * nColl
+                            cpi = ti.atomic_add(self.num_cp[None], 1)
+                            self.collPs[cpi] = xColl1
+                            rInc1 = xColl1 - self.scene.boxes[iInc].p
+                            rRef1 = xColl1 - self.scene.boxes[iRef].p
+                            n_pc += 1
+                            is1cp = True
+                        if sep2 <= radInc + radRef:
+                            xColl2 = clipped_ps2.p2.v + 0.5 * tm.dot(planePoint - clipped_ps2.p2.v, nColl) * nColl
+                            cpi = ti.atomic_add(self.num_cp[None], 1)
+                            self.collPs[cpi] = xColl2
+                            rInc2 = xColl2 - self.scene.boxes[iInc].p
+                            rRef2 = xColl2 - self.scene.boxes[iRef].p
+                            n_pc += 1
+                            is2cp = True
 
-                    if is1cp:
-                        self.response.addContact(self.scene.boxes[iRef].p,
-                                                 rRef1, rInc1, nColl, iRef, iInc, sep1, n_pc)
-                    if is2cp:
-                        self.response.addContact(self.scene.boxes[iRef].p,
-                                                 rRef2, rInc2, nColl, iRef, iInc, sep2, n_pc)
+                        if is1cp:
+                            self.response.addContact(self.scene.boxes[iRef].p,
+                                                    rRef1, rInc1, nColl, iRef, iInc, sep1, n_pc)
+                        if is2cp:
+                            self.response.addContact(self.scene.boxes[iRef].p,
+                                                    rRef2, rInc2, nColl, iRef, iInc, sep2, n_pc)
+                            
+                elif j >= self.scene.num_boxes: 
+                    j_idx = j - i - 1
+                    R = (self.scene.boxes[i].rad + self.scene.outer_edges[j_idx].rad) * ti.sqrt(2)
+                    r_sum = 0.5 * (self.scene.boxes[i].l + self.scene.outer_edges[j_idx].l)
+                    R = R + ti.sqrt(r_sum.x * r_sum.x + r_sum.y * r_sum.y)
+                    if tm.distance(self.scene.boxes[i].p, self.scene.outer_edges[j_idx].p) > R:
+                        continue
+
+                    incident_body, iv, ie, sep = self.collide_box_box(self.scene.boxes[i],
+                                                                    self.scene.outer_edges[j_idx])
+                    if sep < 0:
+                        print('colliding')
+                        self.coll[i] = ti.u8(255)
+                        self.coll[j] = ti.u8(255)
+                        iInc = j-i if incident_body else i  # index of incident body
+                        iRef = i if incident_body else j-i  # index of reference body
+                        radInc = self.scene.boxes[iInc].rad
+                        radRef = self.scene.boxes[iRef].rad
+                        xColl = b2w(self.scene.boxes[iInc].p,
+                                    self.scene.boxes[iInc].q,
+                                    self.scene.boundaries.p[iv] * self.scene.boxes[iInc].l / 2)
+                        nColl = rot(self.scene.boxes[iRef].q, self.scene.boundaries.n[ie])
+                        e1 = b2w(self.scene.boxes[iRef].p,
+                                self.scene.boxes[iRef].q,
+                                self.scene.boundaries.p[ie] * self.scene.boxes[iRef].l / 2)
+                        e2 = b2w(self.scene.boxes[iRef].p, self.scene.boxes[iRef].q,
+                                self.scene.boundaries.p[(ie + 1) % 4] * self.scene.boxes[iRef].l / 2)
+
+                        eInc, iv2 = self.find_incidentEdge(iv, self.scene.boxes[iInc], nColl)
+                        xColl2 = b2w(self.scene.boxes[iInc].p, self.scene.boxes[iInc].q,
+                                    self.scene.boundaries.p[iv2] * self.scene.boxes[iInc].l / 2)
+
+                        vIn = ContactPoints(p1=Point(v=xColl, vi=iv, boxID=iInc),
+                                            p2=Point(v=xColl2, vi=iv2, boxID=iInc))
+                        inc_tangent_12 = (e1 - e2).normalized()
+                        inc_tangent_21 = -inc_tangent_12
+                        offset_12 = tm.dot(e1, inc_tangent_12)
+                        offset_21 = tm.dot(e2, inc_tangent_21)
+
+                        planePoint = 0.5 * (e1 + e2)
+
+                        clipped_ps1 = self.clipSegmentToRay(vIn, inc_tangent_12, offset_12, iv)
+                        clipped_ps2 = self.clipSegmentToRay(clipped_ps1, inc_tangent_21, offset_21, iv2)
+                        # assert (clipped_ps2.count == 2)
+
+                        sep1 = (clipped_ps2.p1.v - planePoint).dot(nColl)
+                        sep2 = (clipped_ps2.p2.v - planePoint).dot(nColl)
+                        n_pc = 0
+                        rRef1 = vec2(0, 0)
+                        rInc1 = vec2(0, 0)
+                        rRef2 = vec2(0, 0)
+                        rInc2 = vec2(0, 0)
+                        is1cp = False
+                        is2cp = False
+                        if sep1 <= radInc + radRef:
+                            xColl1 = clipped_ps2.p1.v + 0.5 * tm.dot(planePoint - clipped_ps2.p1.v, nColl) * nColl
+                            cpi = ti.atomic_add(self.num_cp[None], 1)
+                            self.collPs[cpi] = xColl1
+                            rInc1 = xColl1 - self.scene.boxes[iInc].p
+                            rRef1 = xColl1 - self.scene.boxes[iRef].p
+                            n_pc += 1
+                            is1cp = True
+                        if sep2 <= radInc + radRef:
+                            xColl2 = clipped_ps2.p2.v + 0.5 * tm.dot(planePoint - clipped_ps2.p2.v, nColl) * nColl
+                            cpi = ti.atomic_add(self.num_cp[None], 1)
+                            self.collPs[cpi] = xColl2
+                            rInc2 = xColl2 - self.scene.boxes[iInc].p
+                            rRef2 = xColl2 - self.scene.boxes[iRef].p
+                            n_pc += 1
+                            is2cp = True
+
+                        if is1cp:
+                            self.response.addContact(self.scene.boxes[iRef].p,
+                                                    rRef1, rInc1, nColl, iRef, iInc, sep1, n_pc)
+                        if is2cp:
+                            self.response.addContact(self.scene.boxes[iRef].p,
+                                                    rRef2, rInc2, nColl, iRef, iInc, sep2, n_pc)
 
     @ti.func
     def clearCollision(self):

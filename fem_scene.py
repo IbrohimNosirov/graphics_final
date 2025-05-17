@@ -33,7 +33,7 @@ class Scene:
     def __init__(self, outer_edges, edge_vertices):
         # data structures
         self.N_outer_edges = outer_edges.shape[0]
-        self.num_boxes = 1
+        self.num_boxes = 2
         self.N = self.N_outer_edges + self.num_boxes
         self.outer_edges = BoxState.field(shape=(self.N_outer_edges,))
         self.boxes = BoxState.field(shape=(self.num_boxes,))
@@ -66,7 +66,7 @@ class Scene:
     def init_boxes(self):
         # TODO: write these as arguments
         pos1 = ti.Vector([0.2,0.2])
-        pos2 = ti.Vector([0.5,0.2])
+        pos2 = ti.Vector([0.45,0.2])
 
         pos = [pos1, pos2]
         for i in range(self.num_boxes): 

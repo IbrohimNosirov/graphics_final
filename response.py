@@ -119,7 +119,7 @@ class CollisionResponse:
 
     @ti.func
     def apply_impulses(self):
-        for i in range(self.scene.N):
+        for i in range(self.scene.num_boxes):
             if self.scene.boxes[i].m > 1e-12:
                  self.scene.boxes[i].v += self.dv[i]
             if self.scene.boxes[i].I > 1e-12:
@@ -151,7 +151,6 @@ class CollisionResponse:
             self.r2[c_id] = r2
             self.sep[c_id] = sep
             self.num_contact[None] += 1
-            print("number of contacts ", self.num_contact[None])
 
     @ti.func
     def clearContact(self):

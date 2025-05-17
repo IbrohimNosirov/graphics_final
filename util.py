@@ -99,6 +99,14 @@ def get_corners(box, ps_np):
     return ps_np
 
 
+def create_circle_points(circles, points):
+    for k in range(circles.shape[0]):
+        for i in range(50):
+            angle = 2 * ti.math.pi * i / 50
+            print(circles[k].p)
+            points[i] = circles[k].p + circles[k].r * ti.Vector([ti.cos(angle), ti.sin(angle)])
+    return points
+
 vec2 = tm.vec2
 
 @ti.func
@@ -130,3 +138,4 @@ def b2w(p, q, X):
 def w2b(p, q, x):
     """world to body"""
     return roti(q, x - p)
+

@@ -122,8 +122,9 @@ def init_D0_inv():
 def update_box_position():
     for i in range(scene.boxes.shape[0]): 
         scene.boxes[i].p += dh * scene.boxes[i].v
-        scene.boxes[i].q += dh * cross(scene.boxes[i].ω, scene.boxes[i].q)
-        scene.boxes[i].q /= scene.boxes[i].q.norm()
+        # scene.boxes[i].q += dh * cross(scene.boxes[i].ω, scene.boxes[i].q)
+        # scene.boxes[i].q /= scene.boxes[i].q.norm()
+
 
 
 # Timestep kernel using NeoHookean model only
@@ -175,12 +176,54 @@ def timestep():
                 v_t = v[i] - v_n       
                 if v_n.dot(n) < 0:     
                     v[i] = v_t
-    
+
+                for k in range(scene.boundaries.shape[0]): 
+                    scene.boundaries.p[k] += v_n / 1000
+
+    for i in range(N): 
+        for j in range(scene.boxes.shape[0]): 
+            min_corner = scene.boxes[j].p - scene.boxes[j].l
+            max_corner = scene.boxes[j].p + scene.boxes[j].l
+            next_pos = x[i] + dh * v[i] 
+            
+            # figure out normal 
+            if next_pos[0] > min_corner[0] and next_pos[0] < max_corner[0] and \
+                next_pos[1] > min_corner[1] and next_pos[1] < max_corner[1]: 
+                # print("Collision with box", i)
+                pass
+
+    for i in range(N): 
+        for j in range(scene.circles.shape[0]): 
+            c = scene.circles[j].p
+            r = scene.circles[j].r
+            next_pos = x[i] + dh * v[i]
+            dist = (next_pos - c).dot(next_pos - c)
+            if dist < r*r + 1e-4:
+                # print("Collision with circle", i)
+                v_n = (next_pos - c).normalized()
+                v[i] -= 2 * v[i].dot(v_n) * v_n
+
+                for k in range(scene.circles.shape[0]):
+                    # scene.circles[k].p -= v_n / 1000
+                    scene.circles[k].v -= v_n / 100
+
+            
+    for i in range(N):
+        x[i] += dh * v[i]
+        # update the position of the circles
+    for j in range(scene.circles.shape[0]):
+        scene.circles[j].p += dh * scene.circles[j].v
+        scene.circles[j].v *= 0.9999
+            # scene.circles[j].q += dh * cross(scene.circles[j].ω, scene.circles[j].q)
+            # scene.circles[j].q /= scene.circles[j].q.norm()
+            
+                
+
     update_box_position()
 
-    collision.clearCollision()
-    collision.collide_bounds()
-    collision.collide_all()
+    # collision.clearCollision()
+    # collision.collide_bounds()
+    # collision.collide_all()
     #collide_all(list of box_states) -> collisions (i1 >= 0)
 
     ## collision response
@@ -191,8 +234,7 @@ def timestep():
     # v[i] = v[i] + dv
 
     # Update FEM positions
-    for i in range(N):
-        x[i] += dh * v[i]
+    
 
     # TODO: update rigid body positions
 
@@ -200,6 +242,7 @@ def timestep():
 
 @ti.kernel
 def reset_user_drag():
+
     force_idx[None] = -1
     spring_force[0] = ti.Vector([0,0])
 
@@ -222,6 +265,8 @@ draw_force_indices = ti.Vector.field(2, shape=1, dtype=int)
 draw_force_indices[0] = ti.Vector([0,1])
 
 ps_np = ti.Vector.field(2, dtype=ti.f32, shape=4)  # 4 vectors of 2D float32
+circle_points = ti.Vector.field(2, shape=(50 * scene.circles.shape[0],), dtype=ti.f32)
+
 
 while window.running:
     if window.is_pressed(ti.ui.LMB):
@@ -262,12 +307,15 @@ while window.running:
     canvas.lines(vertices=x, indices=edges, width=0.002, color=(0,0,0))
 
     # Draw the gingerbread house
-    canvas.lines(scene.boundaries.p, width=0.01, indices=scene.boundary_indices, color=(0.4, 0.2, 0.0))
+    # canvas.lines(scene.boundaries.p, width=0.01, indices=scene.boundary_indices, color=(0.4, 0.2, 0.0))
 
     # Draw the boxes 
-    for i in range(scene.boxes.shape[0]):
-        vertices = get_corners(scene.boxes[i], ps_np)
-        canvas.lines(vertices, width=0.01, indices=scene.vertex_indices, color=(0.4, 0.2, 0.0))
+    # for i in range(scene.boxes.shape[0]):
+    #     vertices = get_corners(scene.boxes[i], ps_np)
+    #     canvas.lines(vertices, width=0.01, indices=scene.vertex_indices, color=(0.4, 0.2, 0.0))
+
+    points = create_circle_points(scene.circles, circle_points)
+    canvas.lines(vertices=circle_points, indices=scene.particle_indices, width=0.05, color=(1.0, 0.0, 0.0))
 
     # GUI text
     gui = window.get_gui()

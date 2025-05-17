@@ -11,6 +11,7 @@ vec3i = ti.types.vector(3, int)
 class Boundary:
     p: vec2
     n: vec2
+    v: vec2
     eps:float
 
 # also add a BoxState class
@@ -28,6 +29,14 @@ class BoxState:
     eps: float # distance to the boundary
     is_mesh : bool 
 
+@ti.dataclass
+class Particle:
+    p: vec2
+    v: vec2
+    r: float
+    eps: float
+    m: float
+
 # Scene-related Data
 @ti.data_oriented
 class Scene:
@@ -42,12 +51,36 @@ class Scene:
         self.boundaries = Boundary.field(shape=(self.nboundary,))
         self.normals = ti.Vector.field(2, shape=(4,), dtype=ti.f32)
         self.normals.from_numpy(np.array([[0,-1], [1,0], [0,1], [-1,0]], dtype=np.float32))
+        self.num_particles = 1 
+        self.circles = Particle.field(shape=(self.num_particles,))
 
 
         # initialize
-        self.init_outer_edges(outer_edges, edge_vertices)
+        # self.init_outer_edges(outer_edges, edge_vertices)
         self.init_gingerbread_box()
         self.init_boxes()
+        self.init_particles()
+
+    def init_particles(self): 
+        """
+        Initializes the particles in the scene. 
+        """
+        for i in range(self.num_particles):
+            p = ti.Vector([0.2, 0.2])
+            self.circles[i].p = p
+            self.circles[i].r = 0.05
+            self.circles[i].v = ti.Vector([0.0, 0.0])
+        self.init_particles_indices()
+
+    def init_particles_indices(self): 
+        """
+        Initializes the particles indices. 
+        """
+        self.particle_indices = ti.field(shape=(50 * self.num_particles,), dtype=ti.i32)
+        for i in range(self.num_particles):
+            for j in range(50):
+                self.particle_indices[50 * i + j] = j
+
 
     def init_outer_edges(self, outer_edges, edge_vertices):
         for i in range(self.N_outer_edges):
@@ -81,7 +114,7 @@ class Scene:
         """
         Initializes the ith box 
         """
-        theta = 0.5
+        theta = 0
         self.boxes[i].p = pos1
         self.boxes[i].q = ti.Vector([tm.cos(theta), tm.sin(theta)])
         self.boxes[i].l = ti.Vector([0.1,0.1])
@@ -89,8 +122,12 @@ class Scene:
         self.boxes[i].ω = 3
         self.boxes[i].is_mesh = False 
 
+
+
+
+
     def init_box_boundaries(self):
-        self.house_width = 0.9
+        self.house_width = 0.7
         self.house_height = 0.6
         self.house_roof_height = 0.3
         self.house_xcenter = 0.5
@@ -114,6 +151,7 @@ class Scene:
         self.boundaries.eps.from_numpy(np.ones(5,  dtype=np.float32) * 1e-2)
         self.boundary_indices = ti.field(shape=(10,), dtype=ti.i32)
         self.vertex_indices = ti.field(shape=(8,), dtype=ti.i32)
+        self.boundaries.v.from_numpy(np.zeros((5,2), dtype=np.float32))
 
     @ti.kernel
     def init_boundary_indices(self):

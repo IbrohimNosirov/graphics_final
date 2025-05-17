@@ -176,7 +176,7 @@ def timestep():
 
     collision.clearCollision()
     collision.collide_bounds()
-#    collision.collide_all()
+    collision.collide_all()
 
     # collision response
     response.PGS()

@@ -64,7 +64,7 @@ class Scene:
             vertex_pair = outer_edges[i]
             v1 = edge_vertices[vertex_pair[0]]
             v2 = edge_vertices[vertex_pair[1]]
-            eps = 1.0e-4
+            eps = 1.0e-3
             self.outer_edges[i].p = (v1 + v2)/2
             self.outer_edges[i].q = v1 - v2
             self.outer_edges[i].l = ti.Vector([np.linalg.norm(v1 - v2), eps])

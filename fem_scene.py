@@ -26,6 +26,7 @@ class BoxState:
     rad: float # collision detection radius
     n: vec2 # normal vector 
     eps: float # distance to the boundary
+    is_mesh : bool 
 
 # Scene-related Data
 @ti.data_oriented
@@ -33,12 +34,15 @@ class Scene:
     def __init__(self, outer_edges, edge_vertices):
         # data structures
         self.N_outer_edges = outer_edges.shape[0]
-        self.num_boxes = 2
+        self.num_boxes = 1
         self.N = self.N_outer_edges + self.num_boxes
         self.outer_edges = BoxState.field(shape=(self.N_outer_edges,))
         self.boxes = BoxState.field(shape=(self.num_boxes,))
         self.nboundary = 5 # a house has 5 edges.
         self.boundaries = Boundary.field(shape=(self.nboundary,))
+        self.normals = ti.Vector.field(2, shape=(4,), dtype=ti.f32)
+        self.normals.from_numpy(np.array([[0,-1], [1,0], [0,1], [-1,0]], dtype=np.float32))
+
 
         # initialize
         self.init_outer_edges(outer_edges, edge_vertices)
@@ -58,6 +62,7 @@ class Scene:
             self.outer_edges[i].I = (1/12) * self.outer_edges[i].m\
                                     * self.outer_edges[i].l.dot(self.outer_edges[i].l)
             self.outer_edges[i].rad = eps
+            self.outer_edges[i].is_mesh = True
 
     def init_gingerbread_box(self):
         self.init_box_boundaries()
@@ -79,9 +84,10 @@ class Scene:
         theta = 0.5
         self.boxes[i].p = pos1
         self.boxes[i].q = ti.Vector([tm.cos(theta), tm.sin(theta)])
-        self.boxes[i].l = ti.Vector([0.2,0.2])
+        self.boxes[i].l = ti.Vector([0.1,0.1])
         self.boxes[i].v = ti.Vector([0.0, 0.1])
         self.boxes[i].ω = 3
+        self.boxes[i].is_mesh = False 
 
     def init_box_boundaries(self):
         self.house_width = 0.9

@@ -29,6 +29,7 @@ class Collision:
 
         self.num_cp = ti.field(int, shape=())
         self.num_cp[None] = 0
+        
 
     @ti.kernel
     def initCollisionPoints(self):
@@ -164,13 +165,14 @@ class Collision:
         vertex_index, edge_index = -1, -1
         # check box j against edges of box i
         for ke in range(4):
-            n = rot(boxi.q, self.scene.boundaries.n[ke])
-            x = b2w(boxi.p, boxi.q, self.scene.boundaries.p[ke] * boxi.l / 2)
+            n = rot(boxi.q, self.scene.normals[ke])
+            x = b2w(boxi.p, boxi.q, self.scene.normals[ke] * boxi.l / 2)
             kv, sep = self.collide_box_halfspace(boxj, x + boxi.rad * n, n)
             if sep > max_sep:
                 vertex_index = kv
                 edge_index = ke
                 max_sep = sep
+
         return vertex_index, edge_index, max_sep
 
     @ti.func
@@ -189,6 +191,7 @@ class Collision:
     def collide_all(self):
         for i in range(self.scene.num_boxes):
             for j in range(self.scene.N-1):
+
                 if j < self.scene.num_boxes and i != j:
                     R = (self.scene.boxes[i].rad + self.scene.boxes[j].rad) * ti.sqrt(2)
                     r_sum = 0.5 * (self.scene.boxes[i].l + self.scene.boxes[j].l)
@@ -197,9 +200,9 @@ class Collision:
                         continue
 
                     incident_body, iv, ie, sep = self.collide_box_box(self.scene.boxes[i],
-                                                                    self.scene.boxes[j])
+                                                                      self.scene.boxes[j])
                     if sep < 0:
-                        print('colliding')
+                        print('Box-Box colliding')
                         self.coll[i] = ti.u8(255)
                         self.coll[j] = ti.u8(255)
                         iInc = j if incident_body else i  # index of incident body
@@ -260,9 +263,11 @@ class Collision:
                             is2cp = True
 
                         if is1cp:
+                            print("box collision")
                             self.response.addContact(self.scene.boxes[iRef].p,
                                                     rRef1, rInc1, nColl, iRef, iInc, sep1, n_pc)
                         if is2cp:
+                            print("box collision")
                             self.response.addContact(self.scene.boxes[iRef].p,
                                                     rRef2, rInc2, nColl, iRef, iInc, sep2, n_pc)
                             
@@ -282,6 +287,7 @@ class Collision:
                         self.coll[j] = ti.u8(255)
                         iInc = j-i if incident_body else i  # index of incident body
                         iRef = i if incident_body else j-i  # index of reference body
+
                         radInc = self.scene.boxes[iInc].rad
                         radRef = self.scene.boxes[iRef].rad
                         xColl = b2w(self.scene.boxes[iInc].p,

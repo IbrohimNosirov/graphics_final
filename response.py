@@ -141,6 +141,7 @@ class CollisionResponse:
         """
         # Note that if i1 < 0, the reference rigid body could be a rigid line boundary. Then, p1 would be a point on the
         # line boundary, r1 would be vec2(0, 0) and n1 would be the normal of the line boundary
+        print("Adding contact")
         if self.num_contact[None] < MAX_CONTACTS:
             c_id = self.num_contact[None]
             self.p1[c_id] = p1

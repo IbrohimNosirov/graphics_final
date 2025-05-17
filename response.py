@@ -3,22 +3,15 @@ import taichi.math as tm
 vec2 = tm.vec2
 vec3 = tm.vec3
 mat3 = tm.mat3
-from scene import *
+from fem_scene import *
 from util import *
 
-# TODO expand this contact dataclass on your own
-# @ti.dataclass
-# class Contact:
-#     # You may add in other fields below for your collision response implementation
 MAX_CONTACTS = 256
-# TODO: you can add other data class if you find that helpful for your
-# implementation. (e.g. BoxState in scene_state.py)
-
 # Contact Solver
 @ti.data_oriented
 class CollisionResponse:
-    def __init__(self, scene_state, Cr, β, μ):
-        self.scene = scene_state
+    def __init__(self, scene, Cr, β, μ):
+        self.scene = scene
         self.Cr = Cr
         self.β = β
         self.μ = μ
@@ -48,43 +41,6 @@ class CollisionResponse:
              self.omega_n[c_idx] = 0.0
 
     @ti.func
-    def clearContact(self):
-        self.num_contact[None] = 0
-        for i in range(self.scene.N):
-            self.dv[i] = vec2(0.0, 0.0)
-            self.dw[i] = 0.0
-        for c_idx in range(MAX_CONTACTS):
-             self.omega_n[c_idx] = 0.0
-
-
-    @ti.func
-    def addContact(self, p1: vec2, r1: vec2, r2: vec2, n1: vec2, i1: int, i2: int, sep:float, nc: int):
-        """
-        This function is being triggered after the
-        :param p1: vec2, the mass center of the reference rigid body
-        :param r1: vec2, the displacement from the reference rigid body mass center to the contact point
-        :param r2: vec2, the displacement from the incident rigid body mass center to the contact point
-        :param n1: vec2, the normal of the reference edge
-        :param i1: int, the index of the reference rigid body. You may find info related to this rigid body in self.state.boxes[i1]
-        :param i2: int, the index of the incident rigid body. You may find info related to this rigid body in self.state.boxes[i2]
-        :param sep: float, the maximum seperation distance between two boxes
-        :param nc: int, number of contact points in between body i1 and i2.
-        :return: void
-        """
-        # Note that if i1 < 0, the reference rigid body could be a rigid line boundary. Then, p1 would be a point on the
-        # line boundary, r1 would be vec2(0, 0) and n1 would be the normal of the line boundary
-        if self.num_contact[None] < MAX_CONTACTS:
-            c_id = self.num_contact[None]
-            self.p1[c_id] = p1
-            self.i1[c_id] = i1
-            self.i2[c_id] = i2
-            self.n1[c_id] = n1
-            self.r1[c_id] = r1
-            self.r2[c_id] = r2
-            self.sep[c_id] = sep
-            self.num_contact[None] += 1
-
-    @ti.kernel
     def pgs_iteration(self):
         self.impulse_change[None] = 0.0
         for c_idx in range(self.num_contact[None]):
@@ -154,18 +110,54 @@ class CollisionResponse:
 
                 self.impulse_change[None] += abs(delta_omega)
 
-
+    @ti.func
     def PGS(self):
-        for i in range(100):
+        i = 0
+        while self.impulse_change[None] < 1e-6 and i < 100:
             self.pgs_iteration()
-            if self.impulse_change[None] < 1e-6:
-                break
+            i += 1
 
-
-    @ti.kernel
+    @ti.func
     def apply_impulses(self):
         for i in range(self.scene.N):
             if self.scene.boxes[i].m > 1e-12:
                  self.scene.boxes[i].v += self.dv[i]
             if self.scene.boxes[i].I > 1e-12:
                  self.scene.boxes[i].ω += self.dw[i]
+
+    @ti.func
+    def addContact(self, p1: vec2, r1: vec2, r2: vec2, n1: vec2, i1: int, i2: int, sep:float, nc: int):
+        """
+        This function is being triggered after the
+        :param p1: vec2, the mass center of the reference rigid body
+        :param r1: vec2, the displacement from the reference rigid body mass center to the contact point
+        :param r2: vec2, the displacement from the incident rigid body mass center to the contact point
+        :param n1: vec2, the normal of the reference edge
+        :param i1: int, the index of the reference rigid body. You may find info related to this rigid body in self.state.boxes[i1]
+        :param i2: int, the index of the incident rigid body. You may find info related to this rigid body in self.state.boxes[i2]
+        :param sep: float, the maximum seperation distance between two boxes
+        :param nc: int, number of contact points in between body i1 and i2.
+        :return: void
+        """
+        # Note that if i1 < 0, the reference rigid body could be a rigid line boundary. Then, p1 would be a point on the
+        # line boundary, r1 would be vec2(0, 0) and n1 would be the normal of the line boundary
+        if self.num_contact[None] < MAX_CONTACTS:
+            c_id = self.num_contact[None]
+            self.p1[c_id] = p1
+            self.i1[c_id] = i1
+            self.i2[c_id] = i2
+            self.n1[c_id] = n1
+            self.r1[c_id] = r1
+            self.r2[c_id] = r2
+            self.sep[c_id] = sep
+            self.num_contact[None] += 1
+            print("number of contacts ", self.num_contact[None])
+
+    @ti.func
+    def clearContact(self):
+        self.num_contact[None] = 0
+        for i in range(self.scene.N):
+            self.dv[i] = vec2(0.0, 0.0)
+            self.dw[i] = 0.0
+        for c_idx in range(MAX_CONTACTS):
+             self.omega_n[c_idx] = 0.0

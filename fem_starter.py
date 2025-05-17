@@ -4,16 +4,21 @@ import numpy as np
 from util import *
 from pywavefront import Wavefront
 from fem_scene import Scene
+from collision import *
+from response import *
 
 # Import force calculation functions from the force_calc module
 from force_calc import (
     compute_D, compute_F, compute_P_NeoHookean, compute_H, update_forces)
 
-# ti.init(arch=ti.cpu, debug=True)
+#ti.init(arch=ti.cpu, debug=True)
 
 ti.init(arch=ti.vulkan)
 
 ## physical quantities
+Cr = 1.0
+β = 0.0
+μ = 0.0
 YoungsModulus = ti.field(ti.f32, ())
 PoissonsRatio = ti.field(ti.f32, ())
 YoungsModulus[None] = 1e3
@@ -70,9 +75,10 @@ np_outer_edges = np.array([list(e) for e in outer_edges_set])
 outer_edges = ti.Vector.field(2, shape=N_outer_edges, dtype=int)
 outer_edges.from_numpy(np_outer_edges)
 
-
 # Create house scene for collision
 scene = Scene(outer_edges, va)
+response = CollisionResponse(scene, Cr, β, μ)
+collision = Collision(scene, response)
 
 #############################################################
 # Simulation parameters
@@ -126,7 +132,7 @@ def timestep():
     # Clear forces over triangles (force is per vertex)
     for i in range(N):
         force[i] = ti.Vector([0.0, 0.0])
-    
+
     # Compute internal forces per triangle using NeoHookean model
     for i in range(N_triangles):
         verts = triangles[i]
@@ -172,9 +178,23 @@ def timestep():
     
     update_box_position()
 
-    # Update positions
+    collision.clearCollision()
+    collision.collide_bounds()
+    collision.collide_all()
+    #collide_all(list of box_states) -> collisions (i1 >= 0)
+
+    ## collision response
+    response.PGS()
+    response.apply_impulses()
+
+    # if FEM object and dv != 0
+    # v[i] = v[i] + dv
+
+    # Update FEM positions
     for i in range(N):
         x[i] += dh * v[i]
+
+    # TODO: update rigid body positions
 
 ##############################################################
 

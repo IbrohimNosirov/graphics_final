@@ -31,15 +31,22 @@ class BoxState:
 @ti.data_oriented
 class Scene:
     def __init__(self, outer_edges, edge_vertices):
+        # data structures
+        self.N_outer_edges = outer_edges.shape[0]
+        self.num_boxes = 1
+        self.N = self.N_outer_edges + self.num_boxes
+        self.outer_edges = BoxState.field(shape=(self.N_outer_edges,))
+        self.boxes = BoxState.field(shape=(self.num_boxes,))
+        self.nboundary = 5 # a house has 5 edges.
+        self.boundaries = Boundary.field(shape=(self.nboundary,))
+
+        # initialize
         self.init_outer_edges(outer_edges, edge_vertices)
         self.init_gingerbread_box()
         self.init_boxes()
 
     def init_outer_edges(self, outer_edges, edge_vertices):
-        N_outer_edges = outer_edges.shape[0]
-        self.outer_edges = BoxState.field(shape=(N_outer_edges,))
-        for i in range(N_outer_edges):
-            # TODO: get vertex positions
+        for i in range(self.N_outer_edges):
             vertex_pair = outer_edges[i]
             v1 = edge_vertices[vertex_pair[0]]
             v2 = edge_vertices[vertex_pair[1]]
@@ -52,15 +59,17 @@ class Scene:
                                     * self.outer_edges[i].l.dot(self.outer_edges[i].l)
             self.outer_edges[i].rad = eps
 
+    def init_gingerbread_box(self):
+        self.init_box_boundaries()
+        self.init_boundary_indices()
+
     def init_boxes(self):
         # TODO: write these as arguments
-        numBoxes = 1
         pos1 = ti.Vector([0.2,0.2])
         pos2 = ti.Vector([0.5,0.2])
 
         pos = [pos1, pos2]
-        self.boxes = BoxState.field(shape=(numBoxes,))
-        for i in range(numBoxes): 
+        for i in range(self.num_boxes): 
             self.init_box(i, pos[i])
     
     def init_box(self, i, pos1): 
@@ -81,27 +90,24 @@ class Scene:
         self.house_xcenter = 0.5
         self.house_ycenter = 0.4
         
-        if not hasattr(self, "boundaries"):
-            self.nboundary = 5
-            self.boundaries = Boundary.field(shape=(5,))
-            ps_np = np.array([  [self.house_xcenter - 0.5 * self.house_width, self.house_ycenter + 0.5 * self.house_height],
-                                [self.house_xcenter - 0.5 * self.house_width, self.house_ycenter - 0.5 * self.house_height],
-                                [self.house_xcenter + 0.5 * self.house_width, self.house_ycenter - 0.5 * self.house_height],
-                                [self.house_xcenter + 0.5 * self.house_width, self.house_ycenter + 0.5 * self.house_height],
-                                [self.house_xcenter, self.house_ycenter + 0.5 * self.house_height + self.house_roof_height]],
-                                dtype=np.float32)
-            rooftop_right = (ps_np[4] - ps_np[3]) / np.linalg.norm(ps_np[4] - ps_np[3])
-            rooftop_left = (ps_np[0] - ps_np[4]) / np.linalg.norm(ps_np[0] - ps_np[4])
+        ps_np = np.array([  [self.house_xcenter - 0.5 * self.house_width, self.house_ycenter + 0.5 * self.house_height],
+                            [self.house_xcenter - 0.5 * self.house_width, self.house_ycenter - 0.5 * self.house_height],
+                            [self.house_xcenter + 0.5 * self.house_width, self.house_ycenter - 0.5 * self.house_height],
+                            [self.house_xcenter + 0.5 * self.house_width, self.house_ycenter + 0.5 * self.house_height],
+                            [self.house_xcenter, self.house_ycenter + 0.5 * self.house_height + self.house_roof_height]],
+                            dtype=np.float32)
+        rooftop_right = (ps_np[4] - ps_np[3]) / np.linalg.norm(ps_np[4] - ps_np[3])
+        rooftop_left = (ps_np[0] - ps_np[4]) / np.linalg.norm(ps_np[0] - ps_np[4])
 
-            self.boundaries.p.from_numpy(ps_np)
-            self.boundaries.n.from_numpy(np.array([[1, 0],
-                                                    [0, 1],
-                                                    [-1, 0],
-                                                    [-rooftop_right[1], rooftop_right[0]], 
-                                                    [-rooftop_left[1], rooftop_left[0]]], dtype=np.float32))
-            self.boundaries.eps.from_numpy(np.ones(5,  dtype=np.float32) * 1e-2)
-            self.boundary_indices = ti.field(shape=(10,), dtype=ti.i32)
-            self.vertex_indices = ti.field(shape=(8,), dtype=ti.i32)
+        self.boundaries.p.from_numpy(ps_np)
+        self.boundaries.n.from_numpy(np.array([[1, 0],
+                                                [0, 1],
+                                                [-1, 0],
+                                                [-rooftop_right[1], rooftop_right[0]], 
+                                                [-rooftop_left[1], rooftop_left[0]]], dtype=np.float32))
+        self.boundaries.eps.from_numpy(np.ones(5,  dtype=np.float32) * 1e-2)
+        self.boundary_indices = ti.field(shape=(10,), dtype=ti.i32)
+        self.vertex_indices = ti.field(shape=(8,), dtype=ti.i32)
 
     @ti.kernel
     def init_boundary_indices(self):
@@ -112,7 +118,3 @@ class Scene:
         for i in range(4):
             self.vertex_indices[2 * i] = i
             self.vertex_indices[2 * i + 1] = (i + 1) % 4
-
-    def init_gingerbread_box(self):
-        self.init_box_boundaries()
-        self.init_boundary_indices()

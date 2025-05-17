@@ -8,15 +8,14 @@ vec4i = tm.ivec4
 vec3i = tm.ivec3
 
 mat3 = tm.mat3
-from response import *
 from util import *
 
+MAX_CONTACTS = 256
 Point = ti.types.struct(v=vec2, vi=int, incI=int, ei=int, refI=int)
 ContactPoints = ti.types.struct(p1=Point, p2=Point, count=int)
 
 @ti.data_oriented
 class Collision:
-
     def __init__(self, scene, response):
         self.scene = scene
         self.response = response
@@ -36,17 +35,6 @@ class Collision:
         for i in range(self.scene.N * (self.scene.N + 1)):
             self.collPs[i].fill(-1)
 
-    @ti.kernel
-    def clearCollision(self):
-        self.response.clearContact()
-        for i in range(self.scene.N):
-            self.coll[i] = ti.u8(0)
-
-        for i in range(self.num_cp[None]):
-            self.collPs[i].fill(-1)
-
-        self.num_cp[None] = 0
-
     @ti.func
     def collide_box_halfspace(self, box, x, n):
         """
@@ -58,9 +46,9 @@ class Collision:
         """
         sep = np.inf
         index = -1
-        for i in range(4):
-            s = self.scene.corners[i]
-            pWorld = b2w(box.p, box.q, s * box.l / 2)
+        for i in range(self.scene.nboundary):
+            s = self.scene.boundaries.p[i]
+            pWorld = b2w(box.p, box.q, s*box.l/2)
             dist = (pWorld - x).dot(n) - box.rad
             if dist < sep:
                 sep = dist
@@ -75,7 +63,7 @@ class Collision:
         edge = -1
         for shift in range(-1, 1):
             ie = (iv + shift) % 4
-            inc_n = rot(box_inc.q, self.scene.normals[ie])
+            inc_n = rot(box_inc.q, self.scene.boundaries.n[ie])
             curr_nd = tm.dot(inc_n, ref_n)
             if curr_nd < normal_d:
                 edge = ie
@@ -129,7 +117,7 @@ class Collision:
 
         return ContactPoints(p1=out_p1, p2=out_p2, count=count)
 
-    @ti.kernel
+    @ti.func
     def collide_bounds(self):
         for i in range(self.scene.N):
             box = self.scene.boxes[i]
@@ -137,7 +125,7 @@ class Collision:
                 boundary = self.scene.boundaries[j]
                 x = boundary.p
                 n = boundary.n
-                iv, sep = self.collide_box_halfspace(box, x + boundary.rad * n, n)
+                iv, sep = self.collide_box_halfspace(box, x + boundary.eps * n, n)
                 n_pc = 0
                 is1cp = False
                 is2cp = False
@@ -146,18 +134,18 @@ class Collision:
                 x2 = vec2(0, 0)
                 if sep <= 0:
                     self.coll[i] = ti.u8(255)
-                    r = rot(box.q, self.scene.corners[iv] * box.l / 2)
+                    r = rot(box.q, self.scene.boundaries.p[iv] * box.l / 2)
                     cpi = ti.atomic_add(self.num_cp[None], 1)
                     self.collPs[cpi] = r + box.p
                     is1cp = True
                     n_pc += 1
 
                     eInc, iv2 = self.find_incidentEdge(iv, box, n)
-                    x2 = b2w(box.p, box.q, self.scene.corners[iv2] * box.l / 2)
+                    x2 = b2w(box.p, box.q, self.scene.boundaries.p[iv2] * box.l / 2)
 
-                    if tm.dot(x2 - x, n) <= boundary.rad + box.rad:
+                    if tm.dot(x2 - x, n) <= boundary.eps + box.rad:
                         self.coll[i] = ti.u8(255)
-                        r2 = rot(box.q, self.scene.corners[iv2] * box.l / 2)
+                        r2 = rot(box.q, self.scene.boundaries.p[iv2] * box.l / 2)
                         cpi = ti.atomic_add(self.num_cp[None], 1)
                         self.collPs[cpi] = r2 + box.p
                         is2cp = True
@@ -174,8 +162,8 @@ class Collision:
         vertex_index, edge_index = -1, -1
         # check box j against edges of box i
         for ke in range(4):
-            n = rot(boxi.q, self.scene.normals[ke])
-            x = b2w(boxi.p, boxi.q, self.scene.corners[ke] * boxi.l / 2)
+            n = rot(boxi.q, self.scene.boundaries.n[ke])
+            x = b2w(boxi.p, boxi.q, self.scene.boundaries.p[ke] * boxi.l / 2)
             kv, sep = self.collide_box_halfspace(boxj, x + boxi.rad * n, n)
             if sep > max_sep:
                 vertex_index = kv
@@ -195,7 +183,7 @@ class Collision:
             incident_body = 1
         return incident_body, vertex_index, edge_index, max_sep
 
-    @ti.kernel
+    @ti.func
     def collide_all(self):
         for i in range(self.scene.N):
             for j in range(i):
@@ -216,17 +204,17 @@ class Collision:
                     radRef = self.scene.boxes[iRef].rad
                     xColl = b2w(self.scene.boxes[iInc].p,
                                 self.scene.boxes[iInc].q,
-                                self.scene.corners[iv] * self.scene.boxes[iInc].l / 2)
-                    nColl = rot(self.scene.boxes[iRef].q, self.scene.normals[ie])
+                                self.scene.boundaries.p[iv] * self.scene.boxes[iInc].l / 2)
+                    nColl = rot(self.scene.boxes[iRef].q, self.scene.boundaries.n[ie])
                     e1 = b2w(self.scene.boxes[iRef].p,
                              self.scene.boxes[iRef].q,
-                             self.scene.corners[ie] * self.scene.boxes[iRef].l / 2)
+                             self.scene.boundaries.p[ie] * self.scene.boxes[iRef].l / 2)
                     e2 = b2w(self.scene.boxes[iRef].p, self.scene.boxes[iRef].q,
-                             self.scene.corners[(ie + 1) % 4] * self.scene.boxes[iRef].l / 2)
+                             self.scene.boundaries.p[(ie + 1) % 4] * self.scene.boxes[iRef].l / 2)
 
                     eInc, iv2 = self.find_incidentEdge(iv, self.scene.boxes[iInc], nColl)
                     xColl2 = b2w(self.scene.boxes[iInc].p, self.scene.boxes[iInc].q,
-                                 self.scene.corners[iv2] * self.scene.boxes[iInc].l / 2)
+                                 self.scene.boundaries.p[iv2] * self.scene.boxes[iInc].l / 2)
 
                     vIn = ContactPoints(p1=Point(v=xColl, vi=iv, boxID=iInc),
                                         p2=Point(v=xColl2, vi=iv2, boxID=iInc))
@@ -273,3 +261,14 @@ class Collision:
                     if is2cp:
                         self.response.addContact(self.scene.boxes[iRef].p,
                                                  rRef2, rInc2, nColl, iRef, iInc, sep2, n_pc)
+
+    @ti.func
+    def clearCollision(self):
+        self.response.clearContact()
+        for i in range(self.scene.N):
+            self.coll[i] = ti.u8(0)
+
+        for i in range(self.num_cp[None]):
+            self.collPs[i].fill(-1)
+
+        self.num_cp[None] = 0

@@ -184,8 +184,8 @@ def timestep():
     #collide_all(list of box_states) -> collisions (i1 >= 0)
 
     ## collision response
-    response.PGS()
-    response.apply_impulses()
+    # response.PGS()
+    # response.apply_impulses()
 
     # if FEM object and dv != 0
     # v[i] = v[i] + dv
@@ -220,6 +220,8 @@ canvas.set_background_color((1, 1, 1))
 draw_force_vertices = ti.Vector.field(2, shape=2, dtype=ti.f32)
 draw_force_indices = ti.Vector.field(2, shape=1, dtype=int)
 draw_force_indices[0] = ti.Vector([0,1])
+
+ps_np = ti.Vector.field(2, dtype=ti.f32, shape=4)  # 4 vectors of 2D float32
 
 while window.running:
     if window.is_pressed(ti.ui.LMB):
@@ -264,7 +266,7 @@ while window.running:
 
     # Draw the boxes 
     for i in range(scene.boxes.shape[0]):
-        vertices = get_corners(scene.boxes[i])
+        vertices = get_corners(scene.boxes[i], ps_np)
         canvas.lines(vertices, width=0.01, indices=scene.vertex_indices, color=(0.4, 0.2, 0.0))
 
     # GUI text

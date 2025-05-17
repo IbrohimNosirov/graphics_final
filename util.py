@@ -69,7 +69,7 @@ class DistanceMap:
 
         return arr_N // 2
 
-def get_corners(box): 
+def get_corners(box, ps_np): 
     """
     Get the four corners based off 
     """
@@ -77,7 +77,6 @@ def get_corners(box):
     q = box.q
     l = box.l
 
-    ps_np = ti.Vector.field(2, dtype=ti.f32, shape=4)  # 4 vectors of 2D float32
 
     # the corners of the square 
     ps_np[0] = ti.Vector([p[0] - 0.5 * l[0], p[1] + 0.5 * l[1]])
